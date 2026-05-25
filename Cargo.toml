@@ -1,0 +1,10 @@
+[package]
+name = "defradb-rs"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+thiserror = "2"
+
+# ipfs stuff
+ipld-core = "0.4.3"
