@@ -1,0 +1,10 @@
+[package]
+name = "corekv"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+thiserror = "2"
+log = "0.4"
+
+badger-rs = { git = "https://github.com/rustonbsd/badger-rs", rev="8fe1836bac1b7495bd75586813aded3549a00d9d" }

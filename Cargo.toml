@@ -1,0 +1,7 @@
+[workspace]
+members = [
+  "corekv",
+  "keyring",
+  "defradb-rs",
+]
+resolver = "2"
