@@ -1,6 +1,6 @@
 // ref: /keyring/keyring.go
 
-pub const KEYRING_BACKEND_FILE: &str = "file";
+//pub const KEYRING_BACKEND_FILE: &str = "file";
 // pub const KEYRING_BACKEND_SYSTEM: &str = "system"; // not yet implemented
 
 pub trait KeyringT {

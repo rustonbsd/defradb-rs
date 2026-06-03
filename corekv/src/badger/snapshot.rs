@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
 
 use crate::traits::IterOptions;
 use crate::{ReaderWriterIter, ReaderWriterIterType, Snapshot};
@@ -15,16 +16,35 @@ pub enum BadgerSnapshotError {
 pub enum BadgerSnapshotIterError {
     #[error("badger error: {0}")]
     BadgerError(#[from] badger_rs::BadgerError),
+    #[error(
+        "no entry selected: call next() or seek() to select an entry before calling key() or value()"
+    )]
+    NoEntrySelected,
+    #[error(
+        "keys only iterator: value() is not supported on an iterator created with keys_only=true"
+    )]
+    KeysOnly,
 }
 
 pub struct BadgerSnapshotIter {
     inner: badger_rs::BadgerIterator,
     pub(crate) owned_txn: Option<BadgerSnapshot>,
+    selected_entry: AtomicBool,
+    keys_only: bool,
 }
 
 impl BadgerSnapshotIter {
-    pub fn new(inner: badger_rs::BadgerIterator, owned_txn: Option<BadgerSnapshot>) -> Self {
-        Self { inner, owned_txn }
+    pub fn new(
+        inner: badger_rs::BadgerIterator,
+        owned_txn: Option<BadgerSnapshot>,
+        keys_only: bool,
+    ) -> Self {
+        Self {
+            inner,
+            owned_txn,
+            selected_entry: AtomicBool::new(false),
+            keys_only,
+        }
     }
 }
 
@@ -69,10 +89,12 @@ impl ReaderWriterIter for BadgerSnapshot {
 
     fn iter(&self, opts: IterOptions) -> Result<Self::Iter, Self::IterError> {
         self.0
-            .iterator(&opts.into())
+            .iterator(&opts.clone().into())
             .map(|biter| BadgerSnapshotIter {
                 inner: biter,
                 owned_txn: None,
+                selected_entry: AtomicBool::new(false),
+                keys_only: opts.keys_only(),
             })
             .map_err(BadgerSnapshotError::BadgerError)
     }
@@ -95,34 +117,69 @@ impl Writer for BadgerSnapshot {
 impl Iter for BadgerSnapshotIter {
     type IterError = BadgerSnapshotIterError;
 
-    fn has_next(&mut self) -> Result<bool, Self::IterError> {
-        self.inner
+    fn next(&mut self) -> Result<bool, Self::IterError> {
+        let res = self
+            .inner
             .has_next()
-            .map_err(BadgerSnapshotIterError::BadgerError)
+            .map_err(BadgerSnapshotIterError::BadgerError)?;
+        if res {
+            self.selected_entry
+                .store(true, std::sync::atomic::Ordering::SeqCst);
+        }
+        Ok(res)
     }
 
     fn key(&self) -> Result<Vec<u8>, Self::IterError> {
+        if !self
+            .selected_entry
+            .load(std::sync::atomic::Ordering::SeqCst)
+        {
+            return Err(BadgerSnapshotIterError::NoEntrySelected);
+        }
         self.inner
             .key()
             .map_err(BadgerSnapshotIterError::BadgerError)
     }
 
     fn value(&self) -> Result<Vec<u8>, Self::IterError> {
+        if self.keys_only {
+            return Err(BadgerSnapshotIterError::KeysOnly);
+        }
+        if !self
+            .selected_entry
+            .load(std::sync::atomic::Ordering::SeqCst)
+        {
+            return Err(BadgerSnapshotIterError::NoEntrySelected);
+        }
         self.inner
             .value()
             .map_err(BadgerSnapshotIterError::BadgerError)
     }
-    
+
     fn seek(&mut self, key: &[u8]) -> Result<bool, Self::IterError> {
-        self.inner.seek(key).map_err(BadgerSnapshotIterError::BadgerError)
+        let res = self
+            .inner
+            .seek(key)
+            .map_err(BadgerSnapshotIterError::BadgerError)?;
+        if res {
+            self.selected_entry
+                .store(true, std::sync::atomic::Ordering::SeqCst);
+        }
+        Ok(res)
     }
-    
+
     fn reset(&mut self) -> Result<(), Self::IterError> {
-        self.inner.reset().map_err(BadgerSnapshotIterError::BadgerError)
+        self.inner
+            .reset()
+            .map_err(BadgerSnapshotIterError::BadgerError)?;
+        self.selected_entry
+            .store(false, std::sync::atomic::Ordering::SeqCst);
+        Ok(())
     }
-    
+
     fn close(&mut self) -> Result<(), Self::IterError> {
-        self.inner.close().map_err(BadgerSnapshotIterError::BadgerError)
+        self.inner
+            .close()
+            .map_err(BadgerSnapshotIterError::BadgerError)
     }
-    
 }
