@@ -1,12 +1,10 @@
+mod common;
+
 #[cfg(test)]
 mod namespace {
-    use corekv::{
-        BadgerDb, Iter, IterOptions, OpenOptions, PrefixKey, Reader, ReaderWriterIter, Writer,
-    };
+    use corekv::{BadgerDb, Iter, IterOptions, PrefixKey, Reader, ReaderWriterIter, Writer};
 
-    fn db_opts() -> OpenOptions {
-        OpenOptions::builder().in_memory(true).build()
-    }
+    use crate::common::db_opts;
 
     #[test]
     fn test_db_set_namespace() {
