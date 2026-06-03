@@ -1,4 +1,4 @@
-use std::{fs::DirBuilder, path::PathBuf};
+use std::{fs::DirBuilder, path::{Path, PathBuf}};
 
 #[cfg(unix)]
 use std::os::unix::fs::DirBuilderExt as _;
@@ -7,7 +7,6 @@ use thiserror::Error;
 
 use crate::{KeyringT, crypto};
 
-// this error derive IoError
 #[derive(Error, Debug)]
 pub enum KeyringFileError {
     #[error("IoError: {0}")]
@@ -23,8 +22,7 @@ pub struct KeyringFile<'a> {
 }
 
 impl<'a> KeyringFile<'a> {
-    pub fn open(dir: impl Into<PathBuf>, password: &'a [u8]) -> Result<Self, KeyringFileError> {
-        let dir = dir.into();
+    pub fn open(dir: impl AsRef<Path>, password: &'a [u8]) -> Result<Self, KeyringFileError> {
         let mut builder = DirBuilder::new();
         builder.recursive(true);
 
@@ -32,7 +30,7 @@ impl<'a> KeyringFile<'a> {
         builder.mode(0o755);
 
         builder.create(&dir)?;
-        Ok(Self { dir, password })
+        Ok(Self { dir: dir.as_ref().to_path_buf(), password })
     }
 }
 
