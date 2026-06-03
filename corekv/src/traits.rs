@@ -27,12 +27,12 @@ impl IterOptionsBuilder {
         self
     }
 
-    pub fn start(mut self, start: &[u8]) -> Self {
+    pub fn key_range_start(mut self, start: &[u8]) -> Self {
         self.0.start = start.to_vec();
         self
     }
 
-    pub fn end(mut self, end: &[u8]) -> Self {
+    pub fn key_range_end(mut self, end: &[u8]) -> Self {
         self.0.end = end.to_vec();
         self
     }
@@ -65,11 +65,11 @@ impl IterOptions {
         &self.0.prefix
     }
 
-    pub fn start(&self) -> &[u8] {
+    pub fn key_range_start(&self) -> &[u8] {
         &self.0.start
     }
 
-    pub fn end(&self) -> &[u8] {
+    pub fn key_range_end(&self) -> &[u8] {
         &self.0.end
     }
 
@@ -90,7 +90,7 @@ impl From<IterOptions> for badger_rs::IteratorOptions {
 
 pub trait Iter {
     type IterError;
-    fn has_next(&mut self) -> Result<bool, Self::IterError>;
+    fn next(&mut self) -> Result<bool, Self::IterError>;
     fn key(&self) -> Result<Vec<u8>, Self::IterError>;
     fn value(&self) -> Result<Vec<u8>, Self::IterError>;
     fn seek(&mut self, key: &[u8]) -> Result<bool, Self::IterError>;

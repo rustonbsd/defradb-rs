@@ -4,8 +4,8 @@ use std::{path::Path, sync::atomic::AtomicBool};
 use badger_rs::{BadgerError, Database};
 
 use crate::traits::{Db, SnapshotCreator};
+use crate::{Iter, ReaderWriterIterType, Snapshot};
 use crate::{ReaderWriterIter, Writer, badger::snapshot::BadgerSnapshotIter};
-use crate::{ReaderWriterIterType, Snapshot};
 
 use crate::{Reader, badger::BadgerSnapshot};
 
@@ -178,15 +178,15 @@ impl ReaderWriterIter for BadgerDb {
         let c_snapshot = self.create_read_only_snapshot()?;
         c_snapshot
             .0
-            .iterator(&opts.into())
-            .map(|biter| BadgerSnapshotIter::new(biter, Some(c_snapshot)))
+            .iterator(&opts.clone().into())
+            .map(|biter| BadgerSnapshotIter::new(biter, Some(c_snapshot), opts.keys_only()))
             .map_err(BadgerDbError::BadgerError)
     }
 }
 
 /// reproduces same behavior as iterator.withCloser via rust ownership
 /// ref: /corekv/badger_ffi/badger.go ->
-/// ```no_run
+/// ```ignore
 /// it.withCloser(func() error {
 ///     txn.Discard()
 ///     return nil
@@ -194,7 +194,9 @@ impl ReaderWriterIter for BadgerDb {
 /// ```
 impl Drop for BadgerSnapshotIter {
     fn drop(&mut self) {
-        if let Some(owned_txn) = self.owned_txn.take() {
+        if let Some(owned_txn) = self.owned_txn.take()
+            && self.close().is_ok()
+        {
             owned_txn.discard();
         }
     }

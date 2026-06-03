@@ -8,6 +8,8 @@ pub use badger::{
 };
 pub use traits::{Iter, Reader, ReaderWriterIterType, ReaderWriterIter, Writer, Snapshot, SnapshotCreator, Db, IterOptions, IterOptionsBuilder};
 
+pub use namespace::{PrefixKey, PrefixKeyError, PrefixKeyIter};
+
 #[derive(Debug, thiserror::Error)]
 pub enum CoreKvError {
     #[error("badger error: {0}")]
