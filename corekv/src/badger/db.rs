@@ -225,3 +225,5 @@ impl Writer for BadgerDb {
         Ok(())
     }
 }
+
+// maybe add txn discard test if db is used with it's iter owned snapshot discrad behaviour

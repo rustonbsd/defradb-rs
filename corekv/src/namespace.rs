@@ -34,14 +34,18 @@ impl<T> Reader for PrefixKey<T>
 where
     T: Reader,
 {
-    type Error = <T as Reader>::Error;
+    type Error = PrefixKeyError<T::Error>;
 
     fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Self::Error> {
-        self.inner.get(&prefix_key(&self.prefix, key))
+        self.inner
+            .get(&prefix_key(&self.prefix, key))
+            .map_err(Self::Error::InnerError)
     }
 
     fn has(&self, key: &[u8]) -> Result<bool, Self::Error> {
-        self.inner.has(&prefix_key(&self.prefix, key))
+        self.inner
+            .has(&prefix_key(&self.prefix, key))
+            .map_err(Self::Error::InnerError)
     }
 }
 
@@ -49,7 +53,7 @@ impl<T> Writer for PrefixKey<T>
 where
     T: Writer,
 {
-    type Error = PrefixKeyError<<T as Writer>::Error>;
+    type Error = PrefixKeyError<T::Error>;
 
     fn set(&mut self, key: &[u8], value: &[u8]) -> Result<(), Self::Error> {
         if key.is_empty() {
@@ -74,8 +78,8 @@ impl<T> ReaderWriterIter for PrefixKey<T>
 where
     T: ReaderWriterIter,
 {
-    type IterError = PrefixKeyError<<T as ReaderWriterIter>::IterError>;
-    type Iter = PrefixKeyIter<<T as ReaderWriterIter>::Iter>;
+    type IterError = PrefixKeyError<T::IterError>;
+    type Iter = PrefixKeyIter<T::Iter>;
 
     // ref: /corekv/namespace/namespace.go -> func (nstore *Datastore) Iterator(ctx context.Context, opts corekv.IterOptions)
     fn iter(&self, opts: IterOptions) -> Result<Self::Iter, Self::IterError> {
@@ -119,7 +123,7 @@ impl<T> Iter for PrefixKeyIter<T>
 where
     T: Iter,
 {
-    type IterError = PrefixKeyError<<T as Iter>::IterError>;
+    type IterError = PrefixKeyError<T::IterError>;
 
     fn next(&mut self) -> Result<bool, Self::IterError> {
         self.inner.next().map_err(Self::IterError::InnerError)
@@ -156,14 +160,14 @@ impl<T> Db for PrefixKey<T>
 where
     T: Db,
 {
-    type DbError = <T as Db>::DbError;
+    type DbError = PrefixKeyError<T::DbError>;
 
     fn close(&self) {
-        todo!()
+        self.inner.close()
     }
 
     fn drop_all(&self) -> Result<(), Self::DbError> {
-        todo!()
+        self.inner.drop_all().map_err(Self::DbError::InnerError)
     }
 }
 
@@ -171,8 +175,8 @@ impl<T> SnapshotCreator for PrefixKey<T>
 where
     T: SnapshotCreator,
 {
-    type Snapshot = PrefixKey<<T as SnapshotCreator>::Snapshot>;
-    type Error = PrefixKeyError<<T as SnapshotCreator>::Error>;
+    type Snapshot = PrefixKey<T::Snapshot>;
+    type Error = PrefixKeyError<T::Error>;
 
     fn create_read_only_snapshot(&self) -> Result<Self::Snapshot, Self::Error> {
         let snapshot = self.inner.create_read_only_snapshot()?;
@@ -189,7 +193,7 @@ impl<T> Snapshot for PrefixKey<T>
 where
     T: Snapshot,
 {
-    type SnapshotError = PrefixKeyError<<T as Snapshot>::SnapshotError>;
+    type SnapshotError = PrefixKeyError<T::SnapshotError>;
 
     fn commit(&self) -> Result<(), Self::SnapshotError> {
         self.inner.commit().map_err(Self::SnapshotError::InnerError)
