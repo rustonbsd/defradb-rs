@@ -7,11 +7,11 @@ edition = "2024"
 thiserror = "2"
 log = "0.4"
 
-badger-rs = { git = "https://github.com/rustonbsd/badger-rs", rev="b5c535f47ca09f544d7f7a8e742f2bfc77a10d95" }
+badger-rs = { git = "https://github.com/rustonbsd/badger-rs", rev="147550ed3758cdc69cd663f3c5fdce329f86a586" }
 
 [[test]]
-name = "snapshot"
-path = "tests/snapshot.rs"
+name = "iter"
+path = "tests/iter.rs"
 
 [[test]]
 name = "namespace"

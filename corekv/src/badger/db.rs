@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::sync::atomic::Ordering::Relaxed;
 use std::{path::Path, sync::atomic::AtomicBool};
 
 use badger_rs::{BadgerError, Database};
@@ -97,16 +98,14 @@ impl Db for BadgerDb {
     type DbError = BadgerDbError;
 
     fn close(&self) {
-        if !self.inner.closed.load(std::sync::atomic::Ordering::SeqCst) {
+        if !self.inner.closed.load(Relaxed) {
             self.inner.handle.close().ok();
-            self.inner
-                .closed
-                .store(true, std::sync::atomic::Ordering::SeqCst);
+            self.inner.closed.store(true, Relaxed);
         }
     }
 
     fn drop_all(&self) -> Result<(), Self::DbError> {
-        if self.inner.closed.load(std::sync::atomic::Ordering::SeqCst) {
+        if self.inner.closed.load(Relaxed) {
             return Err(BadgerDbError::Closed);
         }
         self.inner
@@ -121,7 +120,7 @@ impl SnapshotCreator for BadgerDb {
     type Error = BadgerDbError;
 
     fn create_read_only_snapshot(&self) -> Result<BadgerSnapshot, BadgerDbError> {
-        if self.inner.closed.load(std::sync::atomic::Ordering::SeqCst) {
+        if self.inner.closed.load(Relaxed) {
             return Err(BadgerDbError::Closed);
         }
         self.inner
@@ -132,7 +131,7 @@ impl SnapshotCreator for BadgerDb {
     }
 
     fn create_read_write_snapshot(&self) -> Result<BadgerSnapshot, BadgerDbError> {
-        if self.inner.closed.load(std::sync::atomic::Ordering::SeqCst) {
+        if self.inner.closed.load(Relaxed) {
             return Err(BadgerDbError::Closed);
         }
         self.inner
@@ -147,6 +146,10 @@ impl Reader for BadgerDb {
     type Error = BadgerDbError;
 
     fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Self::Error> {
+        if self.inner.closed.load(Relaxed) {
+            return Err(BadgerDbError::Closed);
+        }
+
         let c_snapshot = self.create_read_only_snapshot()?;
         let res = c_snapshot.get(key).or_else(|e| {
             if let super::snapshot::BadgerSnapshotError::BadgerError(
@@ -163,6 +166,9 @@ impl Reader for BadgerDb {
     }
 
     fn has(&self, key: &[u8]) -> Result<bool, Self::Error> {
+        if self.inner.closed.load(Relaxed) {
+            return Err(BadgerDbError::Closed);
+        }
         let c_snapshot = self.create_read_only_snapshot()?;
         let res = c_snapshot.has(key).map_err(BadgerDbError::SnapshotError);
         c_snapshot.discard();
@@ -175,6 +181,9 @@ impl ReaderWriterIter for BadgerDb {
     type Iter = BadgerSnapshotIter;
 
     fn iter(&self, opts: crate::IterOptions) -> Result<Self::Iter, Self::IterError> {
+        if self.inner.closed.load(Relaxed) {
+            return Err(BadgerDbError::Closed);
+        }
         let c_snapshot = self.create_read_only_snapshot()?;
         c_snapshot
             .0
@@ -194,9 +203,8 @@ impl ReaderWriterIter for BadgerDb {
 /// ```
 impl Drop for BadgerSnapshotIter {
     fn drop(&mut self) {
-        if let Some(owned_txn) = self.owned_txn.take()
-            && self.close().is_ok()
-        {
+        if let Some(owned_txn) = self.owned_txn.take() {
+            let _ = self.close();
             owned_txn.discard();
         }
     }
@@ -206,6 +214,9 @@ impl Writer for BadgerDb {
     type Error = BadgerDbError;
 
     fn set(&mut self, key: &[u8], value: &[u8]) -> Result<(), Self::Error> {
+        if self.inner.closed.load(Relaxed) {
+            return Err(BadgerDbError::Closed);
+        }
         let mut c_snapshot = self.create_read_write_snapshot()?;
         c_snapshot
             .set(key, value)
@@ -216,6 +227,9 @@ impl Writer for BadgerDb {
     }
 
     fn delete(&mut self, key: &[u8]) -> Result<(), Self::Error> {
+        if self.inner.closed.load(Relaxed) {
+            return Err(BadgerDbError::Closed);
+        }
         let mut c_snapshot = self.create_read_write_snapshot()?;
         c_snapshot
             .delete(key)
