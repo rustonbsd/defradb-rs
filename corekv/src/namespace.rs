@@ -8,7 +8,7 @@ pub enum PrefixKeyError<E> {
     #[error("key cannot be empty")]
     EmptyKey,
     #[error("inner error: {0}")]
-    InnerError(#[from] E),
+    InnerError(#[source] E),
     #[error("invalid prefix in iterator")]
     InvalidPrefix,
 }
@@ -179,12 +179,18 @@ where
     type Error = PrefixKeyError<T::Error>;
 
     fn create_read_only_snapshot(&self) -> Result<Self::Snapshot, Self::Error> {
-        let snapshot = self.inner.create_read_only_snapshot()?;
+        let snapshot = self
+            .inner
+            .create_read_only_snapshot()
+            .map_err(Self::Error::InnerError)?;
         Ok(PrefixKey::wrap(snapshot, self.prefix.clone()))
     }
 
     fn create_read_write_snapshot(&self) -> Result<Self::Snapshot, Self::Error> {
-        let snapshot = self.inner.create_read_write_snapshot()?;
+        let snapshot = self
+            .inner
+            .create_read_write_snapshot()
+            .map_err(Self::Error::InnerError)?;
         Ok(PrefixKey::wrap(snapshot, self.prefix.clone()))
     }
 }

@@ -1,10 +1,12 @@
+// todo: iter on read only snapshot
+// todo: opts.keys_only() respected
+// todo: make sure no ffi panics are possible in non standard usage (eg iterating after close, iterating after snapshot discard, etc)
+
 mod common;
 
 #[cfg(test)]
 mod iter {
-    use corekv::{
-        BadgerDb, BadgerSnapshotIterError, Iter, IterOptions, ReaderWriterIter, Writer,
-    };
+    use corekv::{BadgerDb, BadgerSnapshotIterError, Iter, IterOptions, ReaderWriterIter, Writer};
 
     use crate::common::db_opts;
 
