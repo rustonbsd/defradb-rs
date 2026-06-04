@@ -1,6 +1,6 @@
+mod traits;
 mod badger;
 mod namespace;
-mod traits;
 
 pub use badger::{BadgerDb, BadgerDbError, OpenOptions};
 pub use badger::{
@@ -9,13 +9,3 @@ pub use badger::{
 pub use traits::{Iter, Reader, ReaderWriterIterType, ReaderWriterIter, Writer, Snapshot, SnapshotCreator, Db, IterOptions, IterOptionsBuilder};
 
 pub use namespace::{PrefixKey, PrefixKeyError, PrefixKeyIter};
-
-#[derive(Debug, thiserror::Error)]
-pub enum CoreKvError {
-    #[error("badger error: {0}")]
-    BadgerDbError(#[from] BadgerDbError),
-    #[error("snapshot error: {0}")]
-    SnapshotError(#[from] BadgerSnapshotError),
-    #[error("snapshot iterator error: {0}")]
-    SnapshotIterError(#[from] BadgerSnapshotIterError),
-}

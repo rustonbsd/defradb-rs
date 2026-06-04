@@ -5,7 +5,7 @@ use std::{path::Path, sync::atomic::AtomicBool};
 use badger_rs::{BadgerError, Database};
 
 use crate::traits::{Db, SnapshotCreator};
-use crate::{Iter, ReaderWriterIterType, Snapshot};
+use crate::{BadgerSnapshotError, Iter, ReaderWriterIterType, Snapshot};
 use crate::{ReaderWriterIter, Writer, badger::snapshot::BadgerSnapshotIter};
 
 use crate::{Reader, badger::BadgerSnapshot};
@@ -13,11 +13,15 @@ use crate::{Reader, badger::BadgerSnapshot};
 #[derive(Debug, thiserror::Error)]
 pub enum BadgerDbError {
     #[error("badger error: {0}")]
-    BadgerError(#[from] BadgerError),
-    #[error("snapshot error: {0}")]
-    SnapshotError(#[from] crate::badger::snapshot::BadgerSnapshotError),
+    BadgerError(#[source] BadgerError),
     #[error("datastore is closed")]
     Closed,
+    #[error("snapshot error: {0}")]
+    SnapshotError(#[source] BadgerSnapshotError),
+    #[error("drop all error: {0}")]
+    DropAllError(#[source] BadgerError),
+    #[error("create snapshot error: {0}")]
+    CreateSnapshot(#[source] BadgerError),
 }
 
 #[derive(Debug, Clone)]
@@ -84,7 +88,8 @@ impl ReaderWriterIterType for BadgerDb {}
 
 impl BadgerDb {
     pub fn new(path: impl AsRef<Path>, options: OpenOptions) -> Result<Self, BadgerDbError> {
-        let handle = badger_rs::Database::open(path, &options.into())?;
+        let handle =
+            badger_rs::Database::open(path, &options.into()).map_err(BadgerDbError::BadgerError)?;
         Ok(Self {
             inner: Arc::new(Inner {
                 handle,
@@ -111,7 +116,7 @@ impl Db for BadgerDb {
         self.inner
             .handle
             .drop_all()
-            .map_err(BadgerDbError::BadgerError)
+            .map_err(BadgerDbError::DropAllError)
     }
 }
 
@@ -127,7 +132,7 @@ impl SnapshotCreator for BadgerDb {
             .handle
             .new_txn(true)
             .map(|txn| BadgerSnapshot(Arc::new(txn)))
-            .map_err(BadgerDbError::BadgerError)
+            .map_err(BadgerDbError::CreateSnapshot)
     }
 
     fn create_read_write_snapshot(&self) -> Result<BadgerSnapshot, BadgerDbError> {
@@ -138,7 +143,7 @@ impl SnapshotCreator for BadgerDb {
             .handle
             .new_txn(false)
             .map(|txn| BadgerSnapshot(Arc::new(txn)))
-            .map_err(BadgerDbError::BadgerError)
+            .map_err(BadgerDbError::CreateSnapshot)
     }
 }
 
@@ -152,7 +157,7 @@ impl Reader for BadgerDb {
 
         let c_snapshot = self.create_read_only_snapshot()?;
         let res = c_snapshot.get(key).or_else(|e| {
-            if let super::snapshot::BadgerSnapshotError::BadgerError(
+            if let super::snapshot::BadgerSnapshotError::GetError(
                 badger_rs::BadgerError::NotFound,
             ) = e
             {
@@ -189,7 +194,7 @@ impl ReaderWriterIter for BadgerDb {
             .0
             .iterator(&opts.clone().into())
             .map(|biter| BadgerSnapshotIter::new(biter, Some(c_snapshot), opts.keys_only()))
-            .map_err(BadgerDbError::BadgerError)
+            .map_err(|e| BadgerDbError::SnapshotError(BadgerSnapshotError::IterError(e)))
     }
 }
 
