@@ -8,15 +8,14 @@ mod common;
 mod snapshot {
 
     use corekv::{
-        BadgerDb, BadgerSnapshotError, BadgerSnapshotIterError, Iter, IterOptions, Reader,
-        ReaderWriterIter, Snapshot, SnapshotCreator, Writer,
+        BadgerDb, BadgerSnapshotError, BadgerSnapshotIterError, Iter, IterOptions, Reader, NewIter, Snapshot, SnapshotCreator, Writer
     };
 
     use crate::common::db_opts;
 
     #[test]
     fn test_snapshot_iter() {
-        let db = BadgerDb::new("", db_opts()).expect("opening badgerdb failed");
+        let db = BadgerDb::open("", db_opts()).expect("opening badgerdb failed");
         let mut snapshot = db
             .create_read_write_snapshot()
             .expect("creating snapshot failed");
@@ -49,13 +48,13 @@ mod snapshot {
         iter.close().expect("closing snapshot iterator failed");
         assert!(matches!(
             iter.next(),
-            Err(BadgerSnapshotIterError::IterClosed)
+            Err(BadgerSnapshotIterError::Closed)
         ));
     }
 
     #[test]
     fn test_snapshot_discard() {
-        let db = BadgerDb::new("", db_opts()).expect("opening badgerdb failed");
+        let db = BadgerDb::open("", db_opts()).expect("opening badgerdb failed");
         let mut snapshot = db
             .create_read_write_snapshot()
             .expect("creating snapshot failed");
@@ -86,7 +85,7 @@ mod snapshot {
 
     #[test]
     fn test_snapshot_commit() {
-        let db = BadgerDb::new("", db_opts()).expect("opening badgerdb failed");
+        let db = BadgerDb::open("", db_opts()).expect("opening badgerdb failed");
         let mut snapshot = db
             .create_read_write_snapshot()
             .expect("creating snapshot failed");
