@@ -2,13 +2,13 @@ mod common;
 
 #[cfg(test)]
 mod namespace {
-    use corekv::{BadgerDb, Iter, IterOptions, PrefixKey, Reader, ReaderWriterIter, Writer};
+    use corekv::{BadgerDb, Iter, IterOptions, PrefixKey, Reader, NewIter, Writer};
 
     use crate::common::db_opts;
 
     #[test]
     fn test_db_set_namespace() {
-        let mut db = BadgerDb::new("", db_opts()).expect("opening badgerdb failed");
+        let mut db = BadgerDb::open("", db_opts()).expect("opening badgerdb failed");
         let mut ns_db = PrefixKey::wrap(db.clone(), b"ns1:".to_vec());
 
         db.set(b"key0", b"root0").expect("root store setting key0");
@@ -53,7 +53,7 @@ mod namespace {
 
     #[test]
     fn test_db_iter_namespace() {
-        let mut db = BadgerDb::new("", db_opts()).expect("opening badgerdb failed");
+        let mut db = BadgerDb::open("", db_opts()).expect("opening badgerdb failed");
         let mut ns = PrefixKey::wrap(db.clone(), b"ns1:".to_vec());
 
         for key in 0..2 {

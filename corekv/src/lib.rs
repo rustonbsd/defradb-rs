@@ -1,11 +1,15 @@
-mod traits;
 mod badger;
+mod chunk;
 mod namespace;
+mod traits;
 
-pub use badger::{BadgerDb, BadgerDbError, OpenOptions};
+pub use badger::{BadgerDb, BadgerDbAccessError, OpenOptions};
 pub use badger::{
     BadgerSnapshot, BadgerSnapshotError, BadgerSnapshotIter, BadgerSnapshotIterError,
 };
-pub use traits::{Iter, Reader, ReaderWriterIterType, ReaderWriterIter, Writer, Snapshot, SnapshotCreator, Db, IterOptions, IterOptionsBuilder};
+pub use traits::{
+    Db, Iter, IterOptions, IterOptionsBuilder, Reader, NewIter,
+    Snapshot, SnapshotCreator, Writer,
+};
 
-pub use namespace::{PrefixKey, PrefixKeyError, PrefixKeyIter};
+pub use namespace::{PrefixKey, PrefixKeyAccessError, PrefixKeyIterError, PrefixKeySnapshotError, PrefixKeyIter};

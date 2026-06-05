@@ -2,55 +2,70 @@ use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering::Relaxed;
 
-use badger_rs::BadgerError;
 
-use crate::traits::IterOptions;
-use crate::{ReaderWriterIter, ReaderWriterIterType, Snapshot};
+use crate::traits::{ErrorFamily, IterOptions};
+use crate::{NewIter, Snapshot};
 
 use crate::{Iter, Reader, Writer};
 
 #[derive(Debug, thiserror::Error)]
 pub enum BadgerSnapshotError {
-    #[error("snapshot discarded: no further operations are allowed")]
+    #[error("snapshot is discarded")]
     Discarded,
-    #[error("get error: {0}")]
-    GetError(#[source] BadgerError),
-    #[error("has error: {0}")]
-    HasError(#[source] BadgerError),
-    #[error("commit error: {0}")]
-    CommitError(#[source] BadgerError),
-    #[error("iter error: {0}")]
-    IterError(#[source] BadgerError),
-    #[error("set error: {0}")]
-    SetError(#[source] BadgerError),
-    #[error("delete error: {0}")]
-    DeleteError(#[source] BadgerError),
+
+    #[error("snapshot get failed")]
+    Get(#[source] badger_rs::BadgerError),
+
+    #[error("snapshot has failed")]
+    Has(#[source] badger_rs::BadgerError),
+
+    #[error("snapshot set failed")]
+    Set(#[source] badger_rs::BadgerError),
+
+    #[error("snapshot delete failed")]
+    Delete(#[source] badger_rs::BadgerError),
+
+    #[error("snapshot iter creation failed")]
+    IterCreate(#[source] badger_rs::BadgerError),
+
+    #[error("snapshot commit failed")]
+    Commit(#[source] badger_rs::BadgerError),
 }
 
 #[derive(Debug, thiserror::Error)]
 pub enum BadgerSnapshotIterError {
-    #[error(
-        "no entry selected: call next() or seek() to select an entry before calling key() or value()"
-    )]
+    #[error("snapshot iter has no selected entry")]
     NoEntrySelected,
-    #[error(
-        "keys only iterator: value() is not supported on an iterator created with keys_only=true"
-    )]
+
+    #[error("snapshot iter is keys-only")]
     KeysOnly,
-    #[error("iter is closed: no further operations are allowed")]
-    IterClosed,
-    #[error("next error: {0}")]
-    NextError(#[source] BadgerError),
-    #[error("key error: {0}")]
-    KeyError(#[source] BadgerError),
-    #[error("value error: {0}")]
-    ValueError(#[source] BadgerError),
-    #[error("seek error: {0}")]
-    SeekError(#[source] BadgerError),
-    #[error("reset error: {0}")]
-    ResetError(#[source] BadgerError),
-    #[error("close error: {0}")]
-    CloseError(#[source] BadgerError),
+
+    #[error("snapshot iter is closed")]
+    Closed,
+
+    #[error("snapshot iter next failed")]
+    Next(#[source] badger_rs::BadgerError),
+
+    #[error("snapshot iter key failed")]
+    Key(#[source] badger_rs::BadgerError),
+
+    #[error("snapshot iter value failed")]
+    Value(#[source] badger_rs::BadgerError),
+
+    #[error("snapshot iter seek failed")]
+    Seek(#[source] badger_rs::BadgerError),
+
+    #[error("snapshot iter reset failed")]
+    Reset(#[source] badger_rs::BadgerError),
+
+    #[error("snapshot iter close failed")]
+    Close(#[source] badger_rs::BadgerError),
+}
+
+impl ErrorFamily for BadgerSnapshot {
+    type AccessError = BadgerSnapshotError;
+    type IterError = BadgerSnapshotIterError;
+    type SnapshotError = BadgerSnapshotError;
 }
 
 pub struct BadgerSnapshotIter {
@@ -78,16 +93,12 @@ impl BadgerSnapshotIter {
 #[derive(Debug, Clone)]
 pub struct BadgerSnapshot(pub Arc<badger_rs::Txn>);
 
-impl ReaderWriterIterType for BadgerSnapshot {}
-
 impl Snapshot for BadgerSnapshot {
-    type SnapshotError = BadgerSnapshotError;
-
-    fn commit(&self) -> Result<(), BadgerSnapshotError> {
+    fn commit(&self) -> Result<(), Self::AccessError> {
         if self.0.is_discarded() {
             return Err(BadgerSnapshotError::Discarded);
         }
-        self.0.commit().map_err(BadgerSnapshotError::CommitError)
+        self.0.commit().map_err(BadgerSnapshotError::Commit)
     }
 
     fn discard(&self) {
@@ -99,9 +110,7 @@ impl Snapshot for BadgerSnapshot {
 }
 
 impl Reader for BadgerSnapshot {
-    type Error = BadgerSnapshotError;
-
-    fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Self::Error> {
+    fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Self::AccessError> {
         if self.0.is_discarded() {
             return Err(BadgerSnapshotError::Discarded);
         }
@@ -109,24 +118,23 @@ impl Reader for BadgerSnapshot {
             if let badger_rs::BadgerError::NotFound = e {
                 Ok(None)
             } else {
-                Err(BadgerSnapshotError::GetError(e))
+                Err(BadgerSnapshotError::Get(e))
             }
         })
     }
 
-    fn has(&self, key: &[u8]) -> Result<bool, Self::Error> {
+    fn has(&self, key: &[u8]) -> Result<bool, Self::AccessError> {
         if self.0.is_discarded() {
             return Err(BadgerSnapshotError::Discarded);
         }
-        self.0.has(key).map_err(BadgerSnapshotError::HasError)
+        self.0.has(key).map_err(BadgerSnapshotError::Has)
     }
 }
 
-impl ReaderWriterIter for BadgerSnapshot {
-    type IterError = BadgerSnapshotError;
+impl NewIter for BadgerSnapshot {
     type Iter = BadgerSnapshotIter;
 
-    fn iter(&self, opts: IterOptions) -> Result<Self::Iter, Self::IterError> {
+    fn iter(&self, opts: IterOptions) -> Result<Self::Iter, Self::AccessError> {
         if self.0.is_discarded() {
             return Err(BadgerSnapshotError::Discarded);
         }
@@ -138,27 +146,23 @@ impl ReaderWriterIter for BadgerSnapshot {
                 selected_entry: AtomicBool::new(false),
                 keys_only: opts.keys_only(),
             })
-            .map_err(BadgerSnapshotError::IterError)
+            .map_err(BadgerSnapshotError::IterCreate)
     }
 }
 
 impl Writer for BadgerSnapshot {
-    type Error = BadgerSnapshotError;
-
-    fn set(&mut self, key: &[u8], value: &[u8]) -> Result<(), Self::Error> {
+    fn set(&mut self, key: &[u8], value: &[u8]) -> Result<(), Self::AccessError> {
         if self.0.is_discarded() {
             return Err(BadgerSnapshotError::Discarded);
         }
-        self.0
-            .set(key, value)
-            .map_err(BadgerSnapshotError::SetError)
+        self.0.set(key, value).map_err(BadgerSnapshotError::Set)
     }
 
-    fn delete(&mut self, key: &[u8]) -> Result<(), Self::Error> {
+    fn delete(&mut self, key: &[u8]) -> Result<(), Self::AccessError> {
         if self.0.is_discarded() {
             return Err(BadgerSnapshotError::Discarded);
         }
-        self.0.delete(key).map_err(BadgerSnapshotError::DeleteError)
+        self.0.delete(key).map_err(BadgerSnapshotError::Delete)
     }
 }
 
@@ -167,12 +171,12 @@ impl Iter for BadgerSnapshotIter {
 
     fn next(&mut self) -> Result<bool, Self::IterError> {
         if self.inner.is_closed() {
-            return Err(BadgerSnapshotIterError::IterClosed);
+            return Err(BadgerSnapshotIterError::Closed);
         }
         let res = self
             .inner
             .has_next()
-            .map_err(BadgerSnapshotIterError::NextError)?;
+            .map_err(BadgerSnapshotIterError::Next)?;
         if !self.selected_entry.load(Relaxed) && res {
             self.selected_entry.store(true, Relaxed);
         }
@@ -181,17 +185,17 @@ impl Iter for BadgerSnapshotIter {
 
     fn key(&self) -> Result<Vec<u8>, Self::IterError> {
         if self.inner.is_closed() {
-            return Err(BadgerSnapshotIterError::IterClosed);
+            return Err(BadgerSnapshotIterError::Closed);
         }
         if !self.selected_entry.load(Relaxed) {
             return Err(BadgerSnapshotIterError::NoEntrySelected);
         }
-        self.inner.key().map_err(BadgerSnapshotIterError::KeyError)
+        self.inner.key().map_err(BadgerSnapshotIterError::Key)
     }
 
     fn value(&self) -> Result<Vec<u8>, Self::IterError> {
         if self.inner.is_closed() {
-            return Err(BadgerSnapshotIterError::IterClosed);
+            return Err(BadgerSnapshotIterError::Closed);
         }
         if self.keys_only {
             return Err(BadgerSnapshotIterError::KeysOnly);
@@ -199,19 +203,17 @@ impl Iter for BadgerSnapshotIter {
         if !self.selected_entry.load(Relaxed) {
             return Err(BadgerSnapshotIterError::NoEntrySelected);
         }
-        self.inner
-            .value()
-            .map_err(BadgerSnapshotIterError::ValueError)
+        self.inner.value().map_err(BadgerSnapshotIterError::Value)
     }
 
     fn seek(&mut self, key: &[u8]) -> Result<bool, Self::IterError> {
         if self.inner.is_closed() {
-            return Err(BadgerSnapshotIterError::IterClosed);
+            return Err(BadgerSnapshotIterError::Closed);
         }
         let res = self
             .inner
             .seek(key)
-            .map_err(BadgerSnapshotIterError::SeekError)?;
+            .map_err(BadgerSnapshotIterError::Seek)?;
         if res {
             self.selected_entry.store(true, Relaxed);
         }
@@ -220,21 +222,17 @@ impl Iter for BadgerSnapshotIter {
 
     fn reset(&mut self) -> Result<(), Self::IterError> {
         if self.inner.is_closed() {
-            return Err(BadgerSnapshotIterError::IterClosed);
+            return Err(BadgerSnapshotIterError::Closed);
         }
-        self.inner
-            .reset()
-            .map_err(BadgerSnapshotIterError::ResetError)?;
+        self.inner.reset().map_err(BadgerSnapshotIterError::Reset)?;
         self.selected_entry.store(false, Relaxed);
         Ok(())
     }
 
     fn close(&mut self) -> Result<(), Self::IterError> {
         if self.inner.is_closed() {
-            return Err(BadgerSnapshotIterError::IterClosed);
+            return Err(BadgerSnapshotIterError::Closed);
         }
-        self.inner
-            .close()
-            .map_err(BadgerSnapshotIterError::CloseError)
+        self.inner.close().map_err(BadgerSnapshotIterError::Close)
     }
 }

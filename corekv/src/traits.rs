@@ -1,20 +1,54 @@
-pub trait Reader {
-    type Error;
-    fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Self::Error>;
-    fn has(&self, key: &[u8]) -> Result<bool, Self::Error>;
+use std::{
+    error::Error,
+    fmt::{Debug, Display},
+};
+
+pub trait ErrorFamily {
+    type AccessError: Error + Display + Debug + Send + Sync + 'static;
+    type IterError: Error + Display + Debug + Send + Sync + 'static;
+    type SnapshotError: Error + Display + Debug + Send + Sync + 'static;
 }
 
-pub trait Writer {
-    type Error;
-
-    fn set(&mut self, key: &[u8], value: &[u8]) -> Result<(), Self::Error>;
-    fn delete(&mut self, key: &[u8]) -> Result<(), Self::Error>;
+pub trait Reader: ErrorFamily {
+    fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Self::AccessError>;
+    fn has(&self, key: &[u8]) -> Result<bool, Self::AccessError>;
 }
 
-pub trait ReaderWriterIter {
-    type IterError;
-    type Iter;
-    fn iter(&self, opts: IterOptions) -> Result<Self::Iter, Self::IterError>;
+
+pub trait Writer: ErrorFamily {
+    fn set(&mut self, key: &[u8], value: &[u8]) -> Result<(), Self::AccessError>;
+    fn delete(&mut self, key: &[u8]) -> Result<(), Self::AccessError>;
+}
+
+pub trait NewIter: ErrorFamily {
+    type Iter: Iter<IterError = Self::IterError>;
+    fn iter(&self, opts: IterOptions) -> Result<Self::Iter, Self::AccessError>;
+}
+
+pub trait Iter {
+    type IterError: Error + Display + Debug + Send + Sync + 'static;
+    fn next(&mut self) -> Result<bool, Self::IterError>;
+    fn key(&self) -> Result<Vec<u8>, Self::IterError>;
+    fn value(&self) -> Result<Vec<u8>, Self::IterError>;
+    fn seek(&mut self, key: &[u8]) -> Result<bool, Self::IterError>;
+    fn reset(&mut self) -> Result<(), Self::IterError>;
+    fn close(&mut self) -> Result<(), Self::IterError>;
+}
+
+pub trait SnapshotCreator: ErrorFamily {
+    type Snapshot: Snapshot<SnapshotError = Self::SnapshotError>;
+    fn create_read_only_snapshot(&self) -> Result<Self::Snapshot, Self::AccessError>;
+    fn create_read_write_snapshot(&self) -> Result<Self::Snapshot, Self::AccessError>;
+}
+
+pub trait Snapshot: Reader + Writer + NewIter + Clone + Sync + ErrorFamily {
+    fn commit(&self) -> Result<(), Self::SnapshotError>;
+    fn discard(&self);
+}
+
+pub trait Db: Reader + Writer + NewIter + SnapshotCreator + Clone + Sync + ErrorFamily {
+    fn close(&self);
+    fn drop_all(&self) -> Result<(), Self::AccessError>;
 }
 
 #[derive(Clone, Debug, Default)]
@@ -86,35 +120,4 @@ impl From<IterOptions> for badger_rs::IteratorOptions {
     fn from(opts: IterOptions) -> Self {
         opts.0
     }
-}
-
-pub trait Iter {
-    type IterError;
-    fn next(&mut self) -> Result<bool, Self::IterError>;
-    fn key(&self) -> Result<Vec<u8>, Self::IterError>;
-    fn value(&self) -> Result<Vec<u8>, Self::IterError>;
-    fn seek(&mut self, key: &[u8]) -> Result<bool, Self::IterError>;
-    fn reset(&mut self) -> Result<(), Self::IterError>;
-    fn close(&mut self) -> Result<(), Self::IterError>;
-}
-
-pub trait ReaderWriterIterType: Reader + Writer + ReaderWriterIter<Iter: Iter> {}
-
-pub trait SnapshotCreator {
-    type Snapshot: Snapshot;
-    type Error;
-    fn create_read_only_snapshot(&self) -> Result<Self::Snapshot, Self::Error>;
-    fn create_read_write_snapshot(&self) -> Result<Self::Snapshot, Self::Error>;
-}
-
-pub trait Snapshot: ReaderWriterIterType + Clone + Sync {
-    type SnapshotError;
-    fn commit(&self) -> Result<(), Self::SnapshotError>;
-    fn discard(&self);
-}
-
-pub trait Db: ReaderWriterIterType + SnapshotCreator + Clone + Sync {
-    type DbError;
-    fn close(&self);
-    fn drop_all(&self) -> Result<(), Self::DbError>;
 }

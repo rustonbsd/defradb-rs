@@ -2,26 +2,48 @@ use std::sync::Arc;
 use std::sync::atomic::Ordering::Relaxed;
 use std::{path::Path, sync::atomic::AtomicBool};
 
-use badger_rs::{BadgerError, Database};
+use badger_rs::Database;
 
-use crate::traits::{Db, SnapshotCreator};
-use crate::{BadgerSnapshotError, Iter, ReaderWriterIterType, Snapshot};
-use crate::{ReaderWriterIter, Writer, badger::snapshot::BadgerSnapshotIter};
+use crate::traits::{Db, ErrorFamily, SnapshotCreator};
+use crate::{BadgerSnapshotError, BadgerSnapshotIterError, Iter, Snapshot};
+use crate::{NewIter, Writer, badger::snapshot::BadgerSnapshotIter};
 
 use crate::{Reader, badger::BadgerSnapshot};
 
 #[derive(Debug, thiserror::Error)]
-pub enum BadgerDbError {
-    #[error("badger error: {0}")]
-    BadgerError(#[source] BadgerError),
-    #[error("datastore is closed")]
+pub enum BadgerDbAccessError {
+    #[error("badger db open failed")]
+    Open(#[source] badger_rs::BadgerError),
+
+    #[error("badger db is closed")]
     Closed,
-    #[error("snapshot error: {0}")]
-    SnapshotError(#[source] BadgerSnapshotError),
-    #[error("drop all error: {0}")]
-    DropAllError(#[source] BadgerError),
-    #[error("create snapshot error: {0}")]
-    CreateSnapshot(#[source] BadgerError),
+
+    #[error("badger db get failed")]
+    Get(#[source] BadgerSnapshotError),
+
+    #[error("badger db has failed")]
+    Has(#[source] BadgerSnapshotError),
+
+    #[error("badger db set failed")]
+    Set(#[source] BadgerSnapshotError),
+
+    #[error("badger db delete failed")]
+    Delete(#[source] BadgerSnapshotError),
+
+    #[error("badger db iter creation failed")]
+    IterCreate(#[source] badger_rs::BadgerError),
+
+    #[error("badger db snapshot creation failed")]
+    CreateSnapshot(#[source] badger_rs::BadgerError),
+
+    #[error("badger db drop_all failed")]
+    DropAll(#[source] badger_rs::BadgerError),
+}
+
+impl ErrorFamily for BadgerDb {
+    type AccessError = BadgerDbAccessError;
+    type IterError = BadgerSnapshotIterError;
+    type SnapshotError = BadgerSnapshotError;
 }
 
 #[derive(Debug, Clone)]
@@ -84,12 +106,10 @@ impl From<OpenOptions> for badger_rs::OpenOptions {
     }
 }
 
-impl ReaderWriterIterType for BadgerDb {}
-
 impl BadgerDb {
-    pub fn new(path: impl AsRef<Path>, options: OpenOptions) -> Result<Self, BadgerDbError> {
+    pub fn open(path: impl AsRef<Path>, options: OpenOptions) -> Result<Self, BadgerDbAccessError> {
         let handle =
-            badger_rs::Database::open(path, &options.into()).map_err(BadgerDbError::BadgerError)?;
+            badger_rs::Database::open(path, &options.into()).map_err(BadgerDbAccessError::Open)?;
         Ok(Self {
             inner: Arc::new(Inner {
                 handle,
@@ -100,8 +120,6 @@ impl BadgerDb {
 }
 
 impl Db for BadgerDb {
-    type DbError = BadgerDbError;
-
     fn close(&self) {
         if !self.inner.closed.load(Relaxed) {
             self.inner.handle.close().ok();
@@ -109,92 +127,89 @@ impl Db for BadgerDb {
         }
     }
 
-    fn drop_all(&self) -> Result<(), Self::DbError> {
+    fn drop_all(&self) -> Result<(), Self::AccessError> {
         if self.inner.closed.load(Relaxed) {
-            return Err(BadgerDbError::Closed);
+            return Err(BadgerDbAccessError::Closed);
         }
         self.inner
             .handle
             .drop_all()
-            .map_err(BadgerDbError::DropAllError)
+            .map_err(BadgerDbAccessError::DropAll)
     }
 }
 
 impl SnapshotCreator for BadgerDb {
     type Snapshot = BadgerSnapshot;
-    type Error = BadgerDbError;
 
-    fn create_read_only_snapshot(&self) -> Result<BadgerSnapshot, BadgerDbError> {
+    fn create_read_only_snapshot(&self) -> Result<BadgerSnapshot, Self::AccessError> {
         if self.inner.closed.load(Relaxed) {
-            return Err(BadgerDbError::Closed);
+            return Err(BadgerDbAccessError::Closed);
         }
         self.inner
             .handle
             .new_txn(true)
             .map(|txn| BadgerSnapshot(Arc::new(txn)))
-            .map_err(BadgerDbError::CreateSnapshot)
+            .map_err(BadgerDbAccessError::CreateSnapshot)
     }
 
-    fn create_read_write_snapshot(&self) -> Result<BadgerSnapshot, BadgerDbError> {
+    fn create_read_write_snapshot(&self) -> Result<BadgerSnapshot, Self::AccessError> {
         if self.inner.closed.load(Relaxed) {
-            return Err(BadgerDbError::Closed);
+            return Err(BadgerDbAccessError::Closed);
         }
         self.inner
             .handle
             .new_txn(false)
             .map(|txn| BadgerSnapshot(Arc::new(txn)))
-            .map_err(BadgerDbError::CreateSnapshot)
+            .map_err(BadgerDbAccessError::CreateSnapshot)
     }
 }
 
 impl Reader for BadgerDb {
-    type Error = BadgerDbError;
 
-    fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Self::Error> {
+    fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Self::AccessError> {
         if self.inner.closed.load(Relaxed) {
-            return Err(BadgerDbError::Closed);
+            return Err(BadgerDbAccessError::Closed);
         }
 
         let c_snapshot = self.create_read_only_snapshot()?;
         let res = c_snapshot.get(key).or_else(|e| {
-            if let super::snapshot::BadgerSnapshotError::GetError(
+            if let super::snapshot::BadgerSnapshotError::Get(
                 badger_rs::BadgerError::NotFound,
             ) = e
             {
                 Ok(None)
             } else {
-                Err(BadgerDbError::SnapshotError(e))
+                Err(BadgerDbAccessError::Get(e))
             }
         });
         c_snapshot.discard();
         res
     }
 
-    fn has(&self, key: &[u8]) -> Result<bool, Self::Error> {
+    fn has(&self, key: &[u8]) -> Result<bool, Self::AccessError> {
         if self.inner.closed.load(Relaxed) {
-            return Err(BadgerDbError::Closed);
+            return Err(BadgerDbAccessError::Closed);
         }
         let c_snapshot = self.create_read_only_snapshot()?;
-        let res = c_snapshot.has(key).map_err(BadgerDbError::SnapshotError);
+        let res = c_snapshot.has(key).map_err(BadgerDbAccessError::Has);
         c_snapshot.discard();
         res
     }
 }
 
-impl ReaderWriterIter for BadgerDb {
-    type IterError = BadgerDbError;
+impl NewIter for BadgerDb {
     type Iter = BadgerSnapshotIter;
 
-    fn iter(&self, opts: crate::IterOptions) -> Result<Self::Iter, Self::IterError> {
+    fn iter(&self, opts: crate::IterOptions) -> Result<Self::Iter, Self::AccessError> {
         if self.inner.closed.load(Relaxed) {
-            return Err(BadgerDbError::Closed);
+            return Err(BadgerDbAccessError::Closed);
         }
         let c_snapshot = self.create_read_only_snapshot()?;
         c_snapshot
             .0
             .iterator(&opts.clone().into())
             .map(|biter| BadgerSnapshotIter::new(biter, Some(c_snapshot), opts.keys_only()))
-            .map_err(|e| BadgerDbError::SnapshotError(BadgerSnapshotError::IterError(e)))
+            .map_err(BadgerDbAccessError::IterCreate)
     }
 }
 
@@ -216,30 +231,29 @@ impl Drop for BadgerSnapshotIter {
 }
 
 impl Writer for BadgerDb {
-    type Error = BadgerDbError;
 
-    fn set(&mut self, key: &[u8], value: &[u8]) -> Result<(), Self::Error> {
+    fn set(&mut self, key: &[u8], value: &[u8]) -> Result<(), Self::AccessError> {
         if self.inner.closed.load(Relaxed) {
-            return Err(BadgerDbError::Closed);
+            return Err(BadgerDbAccessError::Closed);
         }
         let mut c_snapshot = self.create_read_write_snapshot()?;
         c_snapshot
             .set(key, value)
-            .map_err(BadgerDbError::SnapshotError)?;
-        c_snapshot.commit().map_err(BadgerDbError::SnapshotError)?;
+            .map_err(BadgerDbAccessError::Set)?;
+        c_snapshot.commit().map_err(BadgerDbAccessError::Set)?;
         c_snapshot.discard();
         Ok(())
     }
 
-    fn delete(&mut self, key: &[u8]) -> Result<(), Self::Error> {
+    fn delete(&mut self, key: &[u8]) -> Result<(), Self::AccessError> {
         if self.inner.closed.load(Relaxed) {
-            return Err(BadgerDbError::Closed);
+            return Err(BadgerDbAccessError::Closed);
         }
         let mut c_snapshot = self.create_read_write_snapshot()?;
         c_snapshot
             .delete(key)
-            .map_err(BadgerDbError::SnapshotError)?;
-        c_snapshot.commit().map_err(BadgerDbError::SnapshotError)?;
+            .map_err(BadgerDbAccessError::Delete)?;
+        c_snapshot.commit().map_err(BadgerDbAccessError::Delete)?;
         c_snapshot.discard();
         Ok(())
     }

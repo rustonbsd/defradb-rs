@@ -72,7 +72,7 @@ source = "git+https://github.com/rustonbsd/badger-rs?branch=main#9e4705e6f7368c6
 [[package]]
 name = "badger-rs"
 version = "0.1.0"
-source = "git+https://github.com/rustonbsd/badger-rs?rev=147550ed3758cdc69cd663f3c5fdce329f86a586#147550ed3758cdc69cd663f3c5fdce329f86a586"
+source = "git+https://github.com/rustonbsd/badger-rs?rev=bc5bc75182a77ff8731b5b5cca4588c1d6b3f7c0#bc5bc75182a77ff8731b5b5cca4588c1d6b3f7c0"
 dependencies = [
  "thiserror",
 ]
@@ -173,7 +173,8 @@ checksum = "2f421161cb492475f1661ddc9815a745a1c894592070661180fdec3d4872e9c3"
 name = "corekv"
 version = "0.1.0"
 dependencies = [
- "badger-rs 0.1.0 (git+https://github.com/rustonbsd/badger-rs?rev=147550ed3758cdc69cd663f3c5fdce329f86a586)",
+ "anyhow",
+ "badger-rs 0.1.0 (git+https://github.com/rustonbsd/badger-rs?rev=bc5bc75182a77ff8731b5b5cca4588c1d6b3f7c0)",
  "log",
  "thiserror",
 ]
