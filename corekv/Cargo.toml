@@ -7,7 +7,10 @@ edition = "2024"
 thiserror = "2"
 log = "0.4"
 
-badger-rs = { git = "https://github.com/rustonbsd/badger-rs", rev="bc5bc75182a77ff8731b5b5cca4588c1d6b3f7c0" }
+badger-rs = { git = "https://github.com/rustonbsd/badger-rs", rev="89ca9d37fddf610b11516d7b0a553ea56099d289" }
+
+[dev-dependencies]
+anyhow = "1"
 
 [[test]]
 name = "iter"
@@ -20,3 +23,7 @@ path = "tests/namespace.rs"
 [[test]]
 name = "snapshot"
 path = "tests/snapshot.rs"
+
+[[test]]
+name = "integration"
+path = "tests/integration/mod.rs"

@@ -6,13 +6,13 @@ mod common;
 
 #[cfg(test)]
 mod iter {
-    use corekv::{BadgerDb, BadgerSnapshotIterError, Iter, IterOptions, ReaderWriterIter, Writer};
+    use corekv::{BadgerDb, BadgerSnapshotIterError, Iter, IterOptions, NewIter, Writer};
 
     use crate::common::db_opts;
 
     #[test]
     fn test_db_iter_trait() {
-        let mut db = BadgerDb::new("", db_opts()).expect("opening badgerdb failed");
+        let mut db = BadgerDb::open("", db_opts()).expect("opening badgerdb failed");
 
         // iter that yields nothing back should not error just return Ok(false)
         let mut null_iter = db
@@ -116,7 +116,7 @@ mod iter {
 
     #[test]
     fn test_db_iter_opts() {
-        let mut db = BadgerDb::new("", db_opts()).expect("opening badgerdb failed");
+        let mut db = BadgerDb::open("", db_opts()).expect("opening badgerdb failed");
 
         for key in 0..2 {
             for end in 0..2 {

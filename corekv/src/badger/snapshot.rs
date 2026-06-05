@@ -2,7 +2,6 @@ use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering::Relaxed;
 
-
 use crate::traits::{ErrorFamily, IterOptions};
 use crate::{NewIter, Snapshot};
 

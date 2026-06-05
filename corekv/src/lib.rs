@@ -12,4 +12,5 @@ pub use traits::{
     Snapshot, SnapshotCreator, Writer,
 };
 
+pub use chunk::{Chunk, ChunkAccessError, ChunkSnapshotError, ChunkIterError, ChunkIter};
 pub use namespace::{PrefixKey, PrefixKeyAccessError, PrefixKeyIterError, PrefixKeySnapshotError, PrefixKeyIter};
