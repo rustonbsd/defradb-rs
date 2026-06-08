@@ -312,6 +312,10 @@ where
     fn drop_all(&self) -> Result<(), Self::AccessError> {
         self.inner.drop_all().map_err(ChunkAccessError::DropAll)
     }
+
+    fn is_closed(&self) -> bool {
+        self.inner.is_closed()
+    }
 }
 
 // todo: might need a custom impl to allow db independent chunk_size

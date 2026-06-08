@@ -1,13 +1,17 @@
-use crate::{DbTest, badger_db_test, get_base_error};
+use corekv::{Db, Snapshot};
 
-fn test_close_then_set<D>(mut db: D)
+use crate::{State, get_base_error, tests};
+
+fn test_close_then_set<D, S>(state: &mut State<D, S>)
 where
-    D: DbTest,
+    D: Db<Snapshot = S, Iter = S::Iter>,
+    S: Snapshot,
 {
-    db.close();
+    state.db.close();
     assert!(
         get_base_error(
-            &db.set(b"not important", b"value")
+            &state
+                .set(b"not important", b"value")
                 .expect_err("should error")
         )
         .to_string()
@@ -15,4 +19,4 @@ where
     );
 }
 
-badger_db_test!(test_close_then_set);
+tests!(test_close_then_set; db);

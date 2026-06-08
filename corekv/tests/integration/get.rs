@@ -1,15 +1,22 @@
-use crate::{DbTest, badger_db_test};
+use corekv::{Db, Snapshot};
 
-fn test_get<D>(db: D)
+use crate::{State, tests};
+
+fn test_get<D, S>(state: &mut State<D, S>)
 where
-    D: DbTest,
+    D: Db<Snapshot = S, Iter = S::Iter>,
+    S: Snapshot,
 {
+    state
+        .commit_after_writes()
+        .expect("snapshot commit multiplier");
     assert!(
-        db.get(b"not important")
+        state
+            .get(b"not important")
             .expect("empty key should not error")
             .is_none()
     );
-    db.close()
+    state.db.close()
 }
 
-badger_db_test!(test_get);
+tests!(test_get; db, snapshot);

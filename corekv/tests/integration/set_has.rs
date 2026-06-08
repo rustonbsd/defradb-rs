@@ -1,13 +1,19 @@
-use crate::{DbTest, badger_db_test};
+use corekv::{Db, Snapshot};
 
-fn test_set_has<D>(mut db: D)
+use crate::{State, tests};
+
+fn test_set_has<D, S>(state: &mut State<D, S>)
 where
-    D: DbTest,
+    D: Db<Snapshot = S, Iter = S::Iter>,
+    S: Snapshot,
 {
-    db.set(b"k1", b"does not matter")
+    state
+        .set(b"k1", b"does not matter")
         .expect("set should succeed");
-    assert!(db.has(b"k1").expect("should succeed"));
-    db.close()
+    state
+        .commit_after_writes()
+        .expect("snapshot commit multiplier");
+    assert!(state.has(b"k1").expect("should succeed"));
 }
 
-badger_db_test!(test_set_has);
+tests!(test_set_has; db, snapshot);
