@@ -49,6 +49,7 @@ pub trait Snapshot: Reader + Writer + NewIter + Clone + Sync + ErrorFamily {
 pub trait Db: Reader + Writer + NewIter + SnapshotCreator + Clone + Sync + ErrorFamily {
     fn close(&self);
     fn drop_all(&self) -> Result<(), Self::AccessError>;
+    fn is_closed(&self) -> bool;
 }
 
 #[derive(Clone, Debug, Default)]

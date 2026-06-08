@@ -1,28 +1,36 @@
-use crate::{DbTest, badger_db_test};
+use corekv::{Db, Snapshot};
 
-fn test_set_get<D>(mut db: D)
+use crate::{State, tests};
+
+fn test_set_get<D, S>(state: &mut State<D, S>)
 where
-    D: DbTest,
+    D: Db<Snapshot = S, Iter = S::Iter>,
+    S: Snapshot,
 {
-    db.set(b"k1", b"v1").expect("set should succeed");
-    assert!(db.get(b"k1").expect("get should succeed").as_deref() == Some(b"v1"));
-    db.close()
+    state.set(b"k1", b"v1").expect("set should succeed");
+    state
+        .commit_after_writes()
+        .expect("snapshot commit multiplier");
+    assert!(state.get(b"k1").expect("get should succeed").as_deref() == Some(b"v1"));
 }
 
-fn test_set_get_multiple<D>(mut db: D)
+fn test_set_get_multiple<D, S>(state: &mut State<D, S>)
 where
-    D: DbTest,
+    D: Db<Snapshot = S, Iter = S::Iter>,
+    S: Snapshot,
 {
-    db.set(b"k1", b"v1").expect("set should succeed");
-    db.set(b"k2", b"").expect("set should succeed");
-    db.set(b"k3", b"v3").expect("set should succeed");
+    state.set(b"k1", b"v1").expect("set should succeed");
+    state.set(b"k2", b"").expect("set should succeed");
+    state.set(b"k3", b"v3").expect("set should succeed");
 
-    assert!(db.get(b"k1").expect("get should succeed").as_deref() == Some(b"v1"));
-    assert!(db.get(b"k3").expect("get should succeed").as_deref() == Some(b"v3"));
-    assert!(db.get(b"k2").expect("get should succeed").is_none());
-    assert!(db.get(b"k1").expect("get should succeed").as_deref() == Some(b"v1"));
-    db.close()
+    state
+        .commit_after_writes()
+        .expect("snapshot commit multiplier");
+    assert!(state.get(b"k1").expect("get should succeed").as_deref() == Some(b"v1"));
+    assert!(state.get(b"k3").expect("get should succeed").as_deref() == Some(b"v3"));
+    assert!(state.get(b"k2").expect("get should succeed").is_none());
+    assert!(state.get(b"k1").expect("get should succeed").as_deref() == Some(b"v1"));
 }
 
-badger_db_test!(test_set_get);
-badger_db_test!(test_set_get_multiple);
+tests!(test_set_get; db, snapshot);
+tests!(test_set_get_multiple; db, snapshot);

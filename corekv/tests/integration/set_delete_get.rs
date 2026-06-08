@@ -1,14 +1,24 @@
-use crate::{DbTest, badger_db_test};
+use corekv::{Db, Snapshot};
 
-fn test_set_delete_get<D>(mut db: D)
+use crate::{State, tests};
+
+fn test_set_delete_get<D, S>(state: &mut State<D, S>)
 where
-    D: DbTest,
+    D: Db<Snapshot = S, Iter = S::Iter>,
+    S: Snapshot,
 {
-    db.set(b"k1", b"v1").expect("set should succeed");
-    assert!(db.get(b"k1").expect("get should succeed").as_deref() == Some(b"v1"));
-    db.delete(b"k1").expect("delete should succeed");
-    assert!(db.get(b"k1").expect("empty key should not error").is_none());
-    db.close()
+    state.set(b"k1", b"v1").expect("set should succeed");
+    state.delete(b"k1").expect("delete should succeed");
+
+    state
+        .commit_after_writes()
+        .expect("snapshot commit multiplier");
+    assert!(
+        state
+            .get(b"k1")
+            .expect("empty key should not error")
+            .is_none()
+    );
 }
 
-badger_db_test!(test_set_delete_get);
+tests!(test_set_delete_get; db, snapshot);

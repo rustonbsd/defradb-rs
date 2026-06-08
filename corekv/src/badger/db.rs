@@ -136,6 +136,10 @@ impl Db for BadgerDb {
             .drop_all()
             .map_err(BadgerDbAccessError::DropAll)
     }
+    
+    fn is_closed(&self) -> bool {
+        self.inner.closed.load(Relaxed)
+    }
 }
 
 impl SnapshotCreator for BadgerDb {

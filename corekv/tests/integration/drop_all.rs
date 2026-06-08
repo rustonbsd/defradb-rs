@@ -1,11 +1,13 @@
-use crate::{DbTest, badger_db_test};
+use corekv::{Db, Snapshot};
 
-fn test_drop_all<D>(db: D)
+use crate::{State, tests};
+
+fn test_drop_all<D, S>(state: &mut State<D, S>)
 where
-    D: DbTest,
+    D: Db<Snapshot = S, Iter = S::Iter>,
+    S: Snapshot,
 {
-    assert!(db.drop_all().is_ok());
-    db.close()
+    assert!(state.drop_all().is_ok());
 }
 
-badger_db_test!(test_drop_all);
+tests!(test_drop_all; db);

@@ -238,6 +238,10 @@ where
             .drop_all()
             .map_err(PrefixKeyAccessError::DropAll)
     }
+
+    fn is_closed(&self) -> bool {
+        self.inner.is_closed()
+    }
 }
 
 impl<T> SnapshotCreator for PrefixKey<T>
