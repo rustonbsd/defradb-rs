@@ -10,4 +10,4 @@ where
     assert!(state.drop_all().is_ok());
 }
 
-tests!(test_drop_all; db);
+tests!(test_drop_all: db);

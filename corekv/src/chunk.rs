@@ -99,6 +99,7 @@ pub struct Chunk<T> {
     key_len: Arc<AtomicUsize>,
 }
 
+#[derive(Debug)]
 pub struct ChunkIter<I> {
     inner: I,
     key_len: usize,

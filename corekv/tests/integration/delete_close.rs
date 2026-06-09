@@ -13,4 +13,4 @@ where
     assert!(err_msg.ends_with("db is closed") || err_msg.ends_with("Database closed"));
 }
 
-tests!(test_close_then_delete; db);
+tests!(test_close_then_delete: db);

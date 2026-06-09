@@ -10,17 +10,13 @@ where
     state
         .commit_after_writes()
         .expect("snapshot commit multiplier");
-    let mut iter = state
-        .iter(IterOptions::default())
-        .expect("failed to create iterator");
+    let mut iter = state.iter(IterOptions::default()).expect("create iter");
     state.db.close();
     assert!(
-        get_base_error(
-            &Box::new(iter.next().expect_err("next on closed iter expect error")).into()
-        )
-        .to_string()
-        .ends_with("Database closed")
+        get_base_error(&Box::new(iter.next().expect_err("next on closed iter errors")).into())
+            .to_string()
+            .ends_with("Database closed")
     );
 }
 
-tests!(test_close_next; db, snapshot);
+tests!(test_close_next: db + snapshot);

@@ -19,4 +19,4 @@ where
     );
 }
 
-tests!(test_close_then_set; db);
+tests!(test_close_then_set: db);

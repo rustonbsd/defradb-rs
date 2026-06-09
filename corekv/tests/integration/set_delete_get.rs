@@ -7,8 +7,8 @@ where
     D: Db<Snapshot = S, Iter = S::Iter>,
     S: Snapshot,
 {
-    state.set(b"k1", b"v1").expect("set should succeed");
-    state.delete(b"k1").expect("delete should succeed");
+    state.set(b"k1", b"v1").expect("set item");
+    state.delete(b"k1").expect("delete item");
 
     state
         .commit_after_writes()
@@ -16,9 +16,9 @@ where
     assert!(
         state
             .get(b"k1")
-            .expect("empty key should not error")
+            .expect("returns empty value: None")
             .is_none()
     );
 }
 
-tests!(test_set_delete_get; db, snapshot);
+tests!(test_set_delete_get: db + snapshot);

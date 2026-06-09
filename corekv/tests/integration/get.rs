@@ -13,10 +13,10 @@ where
     assert!(
         state
             .get(b"not important")
-            .expect("empty key should not error")
+            .expect("returns empty value: None")
             .is_none()
     );
     state.db.close()
 }
 
-tests!(test_get; db, snapshot);
+tests!(test_get: db + snapshot);

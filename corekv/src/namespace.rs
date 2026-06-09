@@ -83,6 +83,7 @@ pub struct PrefixKey<T> {
     prefix: Vec<u8>,
 }
 
+#[derive(Debug)]
 pub struct PrefixKeyIter<I> {
     inner: I,
     prefix: Vec<u8>,
