@@ -108,14 +108,8 @@ where
 {
     State {
         db: db.clone(),
-        current: Active::Snapshot(
-            db.create_read_write_snapshot()
-                .expect("failed to create snapshot"),
-        ),
-        multi_snap: Some(
-            db.create_read_write_snapshot()
-                .expect("failed to create snapshot"),
-        ),
+        current: Active::Snapshot(db.create_read_write_snapshot().expect("create snapshot")),
+        multi_snap: Some(db.create_read_write_snapshot().expect("create snapshot")),
         commit_after_writes: false,
     }
 }
@@ -132,11 +126,9 @@ where
         return;
     }
     if let Some(snap) = state.multi_snap {
-        let mut iter = snap
-            .iter(IterOptions::default())
-            .expect("failed to create iterator");
-        assert!(!iter.next().expect("failed to read from iterator"));
-        iter.close().expect("failed to close iterator");
+        let mut iter = snap.iter(IterOptions::default()).expect("create iter");
+        assert!(!iter.next().expect("no next item available"));
+        iter.close().expect("close iter");
         snap.discard();
     } else {
         unreachable!("current state is only allowed to be a snapshot");
@@ -157,10 +149,7 @@ where
 {
     State {
         db: db.clone(),
-        current: Active::Snapshot(
-            db.create_read_write_snapshot()
-                .expect("failed to create snapshot"),
-        ),
+        current: Active::Snapshot(db.create_read_write_snapshot().expect("create snapshot")),
         multi_snap: None,
         commit_after_writes: false,
     }
@@ -177,12 +166,9 @@ where
         );
         return;
     }
-    let mut iter = state
-        .db
-        .iter(IterOptions::default())
-        .expect("failed to create iterator");
-    assert!(!iter.next().expect("failed to read from iterator"));
-    iter.close().expect("failed to close iterator");
+    let mut iter = state.db.iter(IterOptions::default()).expect("create iter");
+    assert!(!iter.next().expect("no next item avaliable"));
+    iter.close().expect("close iter");
     if let Active::Snapshot(snap) = state.current {
         snap.discard();
     } else {
@@ -199,10 +185,7 @@ where
 {
     State {
         db: db.clone(),
-        current: Active::Snapshot(
-            db.create_read_write_snapshot()
-                .expect("failed to create snapshot"),
-        ),
+        current: Active::Snapshot(db.create_read_write_snapshot().expect("create snapshot")),
         multi_snap: None,
         commit_after_writes: true,
     }
@@ -378,11 +361,24 @@ macro_rules! snapshot_body {
 
 #[macro_export]
 macro_rules! tests {
-    ($test_fn:ident; $($variant:ident),+ $(,)?) => {
+    ($test_fn:ident: $($rest:tt)+) => {
         mod $test_fn {
             use super::$test_fn;
-            $( $crate::__tests_body!($variant, $test_fn); )+
+            $crate::__tests_variants!($test_fn; $($rest)+);
         }
+    };
+}
+
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __tests_variants {
+    ($test_fn:ident; $variant:ident $(+)?) => {
+        $crate::__tests_body!($variant, $test_fn);
+    };
+
+    ($test_fn:ident; $variant:ident + $($rest:tt)+) => {
+        $crate::__tests_body!($variant, $test_fn);
+        $crate::__tests_variants!($test_fn; $($rest)+);
     };
 }
 

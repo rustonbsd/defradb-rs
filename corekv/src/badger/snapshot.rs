@@ -67,6 +67,7 @@ impl ErrorFamily for BadgerSnapshot {
     type SnapshotError = BadgerSnapshotError;
 }
 
+#[derive(Debug)]
 pub struct BadgerSnapshotIter {
     inner: badger_rs::BadgerIterator,
     pub(crate) owned_txn: Option<BadgerSnapshot>,

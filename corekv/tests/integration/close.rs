@@ -19,5 +19,5 @@ where
     state.db.close();
 }
 
-tests!(test_close; db, snapshot);
-tests!(test_close_twice; db, snapshot);
+tests!(test_close: db + snapshot);
+tests!(test_close_twice: db + snapshot);

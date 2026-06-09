@@ -21,7 +21,7 @@ pub trait Writer: ErrorFamily {
 }
 
 pub trait NewIter: ErrorFamily {
-    type Iter: Iter<IterError = Self::IterError>;
+    type Iter: Iter<IterError = Self::IterError> + Debug;
     fn iter(&self, opts: IterOptions) -> Result<Self::Iter, Self::AccessError>;
 }
 
@@ -55,6 +55,7 @@ pub trait Db: Reader + Writer + NewIter + SnapshotCreator + Clone + Sync + Error
 #[derive(Clone, Debug, Default)]
 pub struct IterOptions(badger_rs::IteratorOptions);
 
+#[derive(Debug)]
 pub struct IterOptionsBuilder(badger_rs::IteratorOptions);
 impl IterOptionsBuilder {
     pub fn prefix(mut self, prefix: &[u8]) -> Self {

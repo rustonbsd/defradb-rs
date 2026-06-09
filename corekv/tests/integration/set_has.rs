@@ -7,13 +7,11 @@ where
     D: Db<Snapshot = S, Iter = S::Iter>,
     S: Snapshot,
 {
-    state
-        .set(b"k1", b"does not matter")
-        .expect("set should succeed");
+    state.set(b"k1", b"does not matter").expect("set k1");
     state
         .commit_after_writes()
         .expect("snapshot commit multiplier");
-    assert!(state.has(b"k1").expect("should succeed"));
+    assert!(state.has(b"k1").expect("has k1"));
 }
 
-tests!(test_set_has; db, snapshot);
+tests!(test_set_has: db + snapshot);

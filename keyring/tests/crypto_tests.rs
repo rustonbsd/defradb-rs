@@ -24,9 +24,9 @@ mod tests {
         let plain_1 = keyring::crypto::decrypt(jwe, password)?;
         println!(
             "RsKeyring plain={} password={} jwe={}",
-            std::str::from_utf8(&plain_1).expect("invalid utf-8"),
-            std::str::from_utf8(password).expect("invalid utf-8"),
-            std::str::from_utf8(jwe).expect("invalid utf-8")
+            std::str::from_utf8(&plain_1).expect("valid utf-8"),
+            std::str::from_utf8(password).expect("valid utf-8"),
+            std::str::from_utf8(jwe).expect("valid utf-8")
         );
         assert_eq!(plain_0.as_bytes(), plain_1.as_slice());
         Ok(())
@@ -41,9 +41,9 @@ mod tests {
         let jwe = keyring::crypto::encrypt(plain_0, password)?;
         println!(
             "RsKeyring plain={} password={} jwe={}",
-            std::str::from_utf8(plain_0).expect("invalid utf-8"),
-            std::str::from_utf8(password).expect("invalid utf-8"),
-            std::str::from_utf8(&jwe).expect("invalid utf-8")
+            std::str::from_utf8(plain_0).expect("valid utf-8"),
+            std::str::from_utf8(password).expect("valid utf-8"),
+            std::str::from_utf8(&jwe).expect("valid utf-8")
         );
         Ok(())
     }

@@ -10,7 +10,7 @@ where
     state
         .commit_after_writes()
         .expect("snapshot commit multiplier");
-    assert!(!state.has(b"not important").expect("has failed"));
+    assert!(!state.has(b"not important").expect("returns false"));
 }
 
-tests!(test_has; db, snapshot);
+tests!(test_has: db + snapshot);

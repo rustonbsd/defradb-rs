@@ -15,4 +15,4 @@ where
     );
 }
 
-tests!(test_close_then_get; db);
+tests!(test_close_then_get: db);
