@@ -2,7 +2,7 @@ use corekv::{Db, IterOptions, Snapshot};
 
 use crate::{State, get_base_error, tests};
 
-fn test_close_iter<D, S>(state: &mut State<D, S>)
+fn test_close_iter<D, S>(mut state: State<D, S>) -> State<D, S>
 where
     D: Db<Snapshot = S, Iter = S::Iter>,
     S: Snapshot,
@@ -15,6 +15,7 @@ where
     ))
     .to_string();
     assert!(err_msg.ends_with("Database closed") || err_msg.ends_with("badger db is closed"));
+    state
 }
 
 tests!(test_close_iter: db + snapshot);

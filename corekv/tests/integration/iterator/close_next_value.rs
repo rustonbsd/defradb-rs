@@ -2,7 +2,7 @@ use corekv::{Db, Iter, IterOptions, Snapshot};
 
 use crate::{State, tests};
 
-fn test_close_next_value<D, S>(state: &mut State<D, S>)
+fn test_close_next_value<D, S>(mut state: State<D, S>) -> State<D, S>
 where
     D: Db<Snapshot = S, Iter = S::Iter>,
     S: Snapshot,
@@ -16,6 +16,7 @@ where
             .expect("value on closed iter should work since snapshot lives after db close"),
         b"v1"
     );
+    state
 }
 
 tests!(test_close_next_value: db + snapshot);

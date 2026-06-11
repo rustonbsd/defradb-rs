@@ -2,7 +2,7 @@ use corekv::{Db, Snapshot};
 
 use crate::{State, tests};
 
-fn test_set_delete_get<D, S>(state: &mut State<D, S>)
+fn test_set_delete_get<D, S>(mut state: State<D, S>) -> State<D, S>
 where
     D: Db<Snapshot = S, Iter = S::Iter>,
     S: Snapshot,
@@ -19,6 +19,7 @@ where
             .expect("returns empty value: None")
             .is_none()
     );
+    state
 }
 
 tests!(test_set_delete_get: db + snapshot);

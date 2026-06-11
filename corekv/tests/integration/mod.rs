@@ -1,5 +1,4 @@
 mod close;
-
 mod delete_close;
 mod drop_all;
 mod get;
@@ -207,6 +206,36 @@ where
     D: Db<Snapshot = S, Iter = S::Iter>,
     S: Snapshot,
 {
+    fn wrap_prefix_key(&self, prefix: &[u8]) -> State<PrefixKey<D>, PrefixKey<S>> {
+        match self.current.clone() {
+            crate::Active::Db(db) => {
+                let prefixed = PrefixKey::wrap(db, prefix.to_vec());
+                State {
+                    current: Active::Db(prefixed.clone()),
+                    db: prefixed,
+                    multi_snap: self
+                        .multi_snap
+                        .clone()
+                        .map(|snap| PrefixKey::wrap(snap, prefix.to_vec())),
+                    commit_after_writes: self.commit_after_writes,
+                }
+            }
+            crate::Active::Snapshot(snap) => {
+                let db_prefixed = PrefixKey::wrap(self.db.clone(), prefix.to_vec());
+                let prefixed = PrefixKey::wrap(snap, prefix.to_vec());
+                State {
+                    current: Active::Snapshot(prefixed.clone()),
+                    db: db_prefixed,
+                    multi_snap: self
+                        .multi_snap
+                        .clone()
+                        .map(|snap| PrefixKey::wrap(snap, prefix.to_vec())),
+                    commit_after_writes: self.commit_after_writes,
+                }
+            }
+        }
+    }
+
     fn set(&mut self, key: &[u8], value: &[u8]) -> Result<(), Box<dyn Error>> {
         match &mut self.current {
             Active::Db(db) => db.set(key, value).map_err(Into::into),
@@ -275,88 +304,83 @@ where
     }
 }
 
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __test_case {
+    (badger_memory, $($rest:tt)*) => {
+        $crate::__test_case!(@impl badger_memory, $crate::open_badger_memory, $($rest)*);
+    };
+    (namespace, $($rest:tt)*) => {
+        $crate::__test_case!(@impl namespace, $crate::open_namespace, $($rest)*);
+    };
+    (chunk, $($rest:tt)*) => {
+        $crate::__test_case!(@impl chunk, $crate::open_chunk, $($rest)*);
+    };
+    (namespace_chunk, $($rest:tt)*) => {
+        $crate::__test_case!(@impl namespace_chunk, $crate::open_namespace_chunk, $($rest)*);
+    };
+    (chunk_namespace, $($rest:tt)*) => {
+        $crate::__test_case!(@impl chunk_namespace, $crate::open_chunk_namespace, $($rest)*);
+    };
+
+    (@impl $name:ident, $open:path, $test_fn:ident, $start_fn:path, $end_fn:path) => {
+        #[test]
+        fn $name() -> anyhow::Result<()> {
+            let db = $open()?;
+            let state = super::super::$test_fn($start_fn(db));
+            $end_fn(state);
+            Ok(())
+        }
+    };
+}
+
 #[macro_export]
 macro_rules! test_cases {
     ($variant:ident, $test_fn:ident, $start_fn:path, $end_fn:path) => {
+        $crate::test_cases!(
+            $variant, $test_fn, $start_fn, $end_fn,
+            [badger_memory namespace chunk namespace_chunk chunk_namespace]
+        );
+    };
+    ($variant:ident, $test_fn:ident, $start_fn:path, $end_fn:path,
+     [$($case:ident)*]) => {
         mod $variant {
-            #[test]
-            fn badger_memory() -> anyhow::Result<()> {
-                let db = $crate::open_badger_memory()?;
-                let mut state = $start_fn(db);
-                super::super::$test_fn(&mut state);
-                $end_fn(state);
-                Ok(())
-            }
-
-            #[test]
-            fn namespace() -> anyhow::Result<()> {
-                let db = $crate::open_namespace()?;
-                let mut state = $start_fn(db);
-                super::super::$test_fn(&mut state);
-                $end_fn(state);
-                Ok(())
-            }
-
-            #[test]
-            fn chunk() -> anyhow::Result<()> {
-                let db = $crate::open_chunk()?;
-                let mut state = $start_fn(db);
-                super::super::$test_fn(&mut state);
-                $end_fn(state);
-                Ok(())
-            }
-
-            #[test]
-            fn namespace_chunk() -> anyhow::Result<()> {
-                let db = $crate::open_namespace_chunk()?;
-                let mut state = $start_fn(db);
-                super::super::$test_fn(&mut state);
-                $end_fn(state);
-                Ok(())
-            }
-
-            #[test]
-            fn chunk_namespace() -> anyhow::Result<()> {
-                let db = $crate::open_chunk_namespace()?;
-                let mut state = $start_fn(db);
-                super::super::$test_fn(&mut state);
-                $end_fn(state);
-                Ok(())
-            }
+            $( $crate::__test_case!($case, $test_fn, $start_fn, $end_fn); )*
         }
     };
 }
 
 #[macro_export]
 macro_rules! db_body {
-    ($test_fn:ident) => {
+    ($test_fn:ident, [$($case:ident)*]) => {
         mod db {
-            $crate::test_cases!(plain, $test_fn, $crate::plain_start, $crate::plain_end);
+            $crate::test_cases!(
+                plain, $test_fn,
+                $crate::plain_start, $crate::plain_end,
+                [$($case)*]
+            );
         }
     };
 }
 
 #[macro_export]
 macro_rules! snapshot_body {
-    ($test_fn:ident) => {
+    ($test_fn:ident, [$($case:ident)*]) => {
         mod snapshot {
             $crate::test_cases!(
-                snapshot_discard,
-                $test_fn,
-                $crate::snapshot_discard_start,
-                $crate::snapshot_discard_end
+                snapshot_discard, $test_fn,
+                $crate::snapshot_discard_start, $crate::snapshot_discard_end,
+                [$($case)*]
             );
             $crate::test_cases!(
-                snapshot_commit,
-                $test_fn,
-                $crate::snapshot_commit_start,
-                $crate::snapshot_commit_end
+                snapshot_commit, $test_fn,
+                $crate::snapshot_commit_start, $crate::snapshot_commit_end,
+                [$($case)*]
             );
             $crate::test_cases!(
-                snapshot_multi,
-                $test_fn,
-                $crate::snapshot_multi_start,
-                $crate::snapshot_multi_end
+                snapshot_multi, $test_fn,
+                $crate::snapshot_multi_start, $crate::snapshot_multi_end,
+                [$($case)*]
             );
         }
     };
@@ -367,31 +391,56 @@ macro_rules! tests {
     ($test_fn:ident: $($rest:tt)+) => {
         mod $test_fn {
             use super::$test_fn;
-            $crate::__tests_variants!($test_fn; $($rest)+);
+            $crate::__tests_parse!($test_fn; []; $($rest)+);
         }
     };
 }
 
 #[doc(hidden)]
 #[macro_export]
-macro_rules! __tests_variants {
-    ($test_fn:ident; $variant:ident $(+)?) => {
-        $crate::__tests_body!($variant, $test_fn);
+macro_rules! __tests_parse {
+    // all cases
+    ($f:ident; [$($v:ident)+];) => {
+        $crate::__tests_emit!($f; [$($v)+];
+            [badger_memory namespace chunk namespace_chunk chunk_namespace]);
     };
+    // exclusions
+    ($f:ident; [$($v:ident)+]; | chunk $(+)?) => {
+        $crate::__tests_emit!($f; [$($v)+]; [badger_memory namespace]);
+    };
+    ($f:ident; [$($v:ident)+]; | namespace $(+)?) => {
+        $crate::__tests_emit!($f; [$($v)+]; [badger_memory chunk]);
+    };
+    ($f:ident; [$($v:ident)+]; | chunk + namespace $(+)?) => {
+        $crate::__tests_emit!($f; [$($v)+]; [badger_memory]);
+    };
+    ($f:ident; [$($v:ident)+]; | namespace + chunk $(+)?) => {
+        $crate::__tests_emit!($f; [$($v)+]; [badger_memory]);
+    };
+    // collect variants (db/snapshot)
+    ($f:ident; [$($v:ident)*]; $next:ident + $($rest:tt)*) => {
+        $crate::__tests_parse!($f; [$($v)* $next]; $($rest)*);
+    };
+    ($f:ident; [$($v:ident)*]; $next:ident $($rest:tt)*) => {
+        $crate::__tests_parse!($f; [$($v)* $next]; $($rest)*);
+    };
+}
 
-    ($test_fn:ident; $variant:ident + $($rest:tt)+) => {
-        $crate::__tests_body!($variant, $test_fn);
-        $crate::__tests_variants!($test_fn; $($rest)+);
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __tests_emit {
+    ($f:ident; [$($variant:ident)+]; $cases:tt) => {
+        $( $crate::__tests_body!($variant, $f, $cases); )+
     };
 }
 
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __tests_body {
-    (db, $test_fn:ident) => {
-        $crate::db_body!($test_fn);
+    (db, $test_fn:ident, $cases:tt) => {
+        $crate::db_body!($test_fn, $cases);
     };
-    (snapshot, $test_fn:ident) => {
-        $crate::snapshot_body!($test_fn);
+    (snapshot, $test_fn:ident, $cases:tt) => {
+        $crate::snapshot_body!($test_fn, $cases);
     };
 }
