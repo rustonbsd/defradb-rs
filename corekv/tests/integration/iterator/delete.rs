@@ -1,7 +1,7 @@
 use crate::{State, tests};
 use corekv::{Db, Iter, IterOptions, Snapshot};
 
-fn test_delete<D, S>(state: &mut State<D, S>)
+fn test_delete<D, S>(mut state: State<D, S>) -> State<D, S>
 where
     D: Db<Snapshot = S, Iter = S::Iter>,
     S: Snapshot,
@@ -31,9 +31,10 @@ where
     assert_eq!(iter.value().expect("get value"), b"v4");
 
     iter.close().expect("close iter");
+    state
 }
 
-fn test_delete_last_item<D, S>(state: &mut State<D, S>)
+fn test_delete_last_item<D, S>(mut state: State<D, S>) -> State<D, S>
 where
     D: Db<Snapshot = S, Iter = S::Iter>,
     S: Snapshot,
@@ -63,9 +64,10 @@ where
     assert_eq!(iter.value().expect("get value"), b"");
 
     iter.close().expect("close iter");
+    state
 }
 
-fn test_delete_only_item<D, S>(state: &mut State<D, S>)
+fn test_delete_only_item<D, S>(mut state: State<D, S>) -> State<D, S>
 where
     D: Db<Snapshot = S, Iter = S::Iter>,
     S: Snapshot,
@@ -82,6 +84,7 @@ where
     assert!(!iter.next().expect("yields next item"));
 
     iter.close().expect("close iter");
+    state
 }
 
 tests!(test_delete: db + snapshot);

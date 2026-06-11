@@ -2,7 +2,7 @@ use corekv::{Db, Iter, IterOptions, Snapshot};
 
 use crate::{State, get_base_error, tests};
 
-fn test_close_seek<D, S>(state: &mut State<D, S>)
+fn test_close_seek<D, S>(mut state: State<D, S>) -> State<D, S>
 where
     D: Db<Snapshot = S, Iter = S::Iter>,
     S: Snapshot,
@@ -20,6 +20,7 @@ where
         .to_string()
         .ends_with("Database closed")
     );
+    state
 }
 
 tests!(test_close_seek: db);
