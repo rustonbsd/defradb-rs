@@ -177,6 +177,7 @@ impl Iter for BadgerSnapshotIter {
             .inner
             .has_next()
             .map_err(BadgerSnapshotIterError::Next)?;
+
         if !self.selected_entry.load(Relaxed) && res {
             self.selected_entry.store(true, Relaxed);
         }

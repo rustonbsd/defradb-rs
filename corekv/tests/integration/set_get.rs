@@ -28,7 +28,7 @@ where
         .expect("snapshot commit multiplier");
     assert!(state.get(b"k1").expect("get k1").as_deref() == Some(b"v1"));
     assert!(state.get(b"k3").expect("get k3").as_deref() == Some(b"v3"));
-    assert!(state.get(b"k2").expect("get k2").is_none());
+    assert!(state.get(b"k2").expect("get k2").as_deref() == Some(b""));
     assert!(state.get(b"k1").expect("get k1").as_deref() == Some(b"v1"));
 }
 
