@@ -17,6 +17,7 @@ use std::error::Error;
 
 use corekv::{BadgerDb, Chunk, Db, Iter, IterOptions, OpenOptions, PrefixKey, Snapshot};
 
+#[derive(Clone)]
 enum Active<D, S>
 where
     D: Db<Snapshot = S>,
@@ -25,6 +26,8 @@ where
     Db(D),
     Snapshot(S),
 }
+
+#[derive(Clone)]
 struct State<D, S>
 where
     D: Db<Snapshot = S>,

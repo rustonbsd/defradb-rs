@@ -7,7 +7,8 @@ edition = "2024"
 thiserror = "2"
 log = "0.4"
 
-badger-rs = { git = "https://github.com/rustonbsd/badger-rs", rev="89ca9d37fddf610b11516d7b0a553ea56099d289" }
+badger-rs = { git = "https://github.com/rustonbsd/badger-rs", rev="398546bb6bf2575ed4d363c71eab8df867fa630f" }
+#badger-rs = {path="../../badger-rs"}
 
 [dev-dependencies]
 anyhow = "1"

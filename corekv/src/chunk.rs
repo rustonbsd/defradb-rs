@@ -111,13 +111,36 @@ pub struct ChunkIter<I> {
     current_chunk_key: Vec<u8>,
 }
 
-impl<T> Chunk<T> {
+impl<T> Chunk<T>
+where
+    T: NewIter,
+{
     pub fn wrap(inner: T, chunk_size: usize, key_len: Option<usize>) -> Self {
+        let key_len = match key_len {
+            Some(key_len) => Some(key_len),
+            None => Self::try_identify_key_len(&inner),
+        };
+
         Self {
             inner,
             chunk_size,
             key_len: Arc::new(AtomicUsize::new(key_len.unwrap_or_default())),
         }
+    }
+
+    fn try_identify_key_len(inner: &T) -> Option<usize> {
+        if let Ok(mut iter) = inner.iter(IterOptions::builder().keys_only(true).build()) {
+            let key_len = if iter.next().is_ok()
+                && let Ok(key) = iter.key()
+            {
+                Some(key.len() - 1)
+            } else {
+                None
+            };
+            let _ = iter.close();
+            return key_len;
+        }
+        None
     }
 }
 
@@ -161,6 +184,13 @@ where
 {
     fn set(&mut self, key: &[u8], value: &[u8]) -> Result<(), Self::AccessError> {
         let mut chunk_key = [key, &[0]].concat();
+        if value.is_empty() {
+            self.inner
+                .set(&chunk_key, &[])
+                .map_err(ChunkAccessError::Set)?;
+            return Ok(());
+        }
+
         for chunk in value.chunks(self.chunk_size) {
             self.inner
                 .set(&chunk_key, chunk)
@@ -211,6 +241,11 @@ where
     type Iter = ChunkIter<T::Iter>;
 
     fn iter(&self, opts: crate::IterOptions) -> Result<Self::Iter, Self::AccessError> {
+        if self.key_len.load(Relaxed) == 0
+            && let Some(key_len) = Self::try_identify_key_len(&self.inner)
+        {
+            self.key_len.store(key_len, Relaxed);
+        }
         let iter = self
             .inner
             .iter(opts.clone())
@@ -235,6 +270,7 @@ where
 
     fn next(&mut self) -> Result<bool, Self::IterError> {
         let mut chunks = Vec::new();
+        let mut empty_chunk = false;
         loop {
             if !self.current_chunk_key.is_empty() {
                 if self.opt_reverse {
@@ -257,8 +293,13 @@ where
             if !self.current_chunk_key.starts_with(&self.current_key) {
                 break;
             }
+
+            if self.current_chunk.is_empty() {
+                empty_chunk = true;
+                break;
+            }
         }
-        if chunks.is_empty() {
+        if chunks.is_empty() && !empty_chunk {
             return Ok(false);
         }
         self.current_value = chunks.concat();
