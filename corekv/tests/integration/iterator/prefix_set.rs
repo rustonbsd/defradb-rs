@@ -17,7 +17,7 @@ where
         .iter(IterOptions::builder().prefix(b"k").build())
         .expect("create iter");
 
-    assert!(iter.next().expect("yields no next item"));
+    assert!(iter.next().expect("yield next item"));
     assert_eq!(iter.key().expect("get key"), b"k1");
     assert_eq!(iter.value().expect("get value"), b"v1.1");
 

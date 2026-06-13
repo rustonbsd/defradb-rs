@@ -11,11 +11,9 @@ where
     state.db.close();
     assert!(
         get_base_error(
-            &Box::new(
-                iter.seek(b"any key")
-                    .expect_err("seek on closed iter errors")
-            )
-            .into()
+            &iter
+                .seek(b"any key")
+                .expect_err("seek on closed iter errors")
         )
         .to_string()
         .ends_with("Database closed")

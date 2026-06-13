@@ -10,9 +10,10 @@ where
     state.db.close();
     assert!(
         get_base_error(
-            &state
+            state
                 .set(b"not important", b"value")
                 .expect_err("should error")
+                .as_ref()
         )
         .to_string()
         .ends_with("db is closed")
