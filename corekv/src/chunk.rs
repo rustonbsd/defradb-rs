@@ -291,11 +291,9 @@ where
             self.current_chunk = self.inner.value().map_err(ChunkIterError::Next)?;
 
             if !self.current_chunk_key.starts_with(&self.current_key) {
-                break;
-            }
-
-            if self.current_chunk.is_empty() {
-                empty_chunk = true;
+                if self.current_chunk.is_empty() {
+                    empty_chunk = true;
+                }
                 break;
             }
         }
