@@ -8,11 +8,12 @@ where
     S: Snapshot,
 {
     state.db.close();
-    let err_msg = get_base_error(&Box::new(
+    let err_msg = get_base_error(
         state
             .iter(IterOptions::default())
-            .expect_err("iter on closed db expect error"),
-    ))
+            .expect_err("iter on closed db expect error")
+            .as_ref(),
+    )
     .to_string();
     assert!(err_msg.ends_with("Database closed") || err_msg.ends_with("badger db is closed"));
     state

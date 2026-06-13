@@ -38,7 +38,7 @@ where
     commit_after_writes: bool,
 }
 
-pub fn format_error_chain(err: &Box<dyn Error>) -> String {
+pub fn format_error_chain(err: &dyn Error) -> String {
     let mut out = err.to_string();
     let mut current = err.source();
 
@@ -51,8 +51,8 @@ pub fn format_error_chain(err: &Box<dyn Error>) -> String {
     out
 }
 
-fn get_base_error(err: &Box<dyn Error>) -> &dyn Error {
-    let mut current = err.as_ref();
+fn get_base_error(err: &dyn Error) -> &dyn Error {
+    let mut current = err;
 
     while let Some(source) = current.source() {
         current = source;

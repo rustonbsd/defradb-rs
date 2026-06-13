@@ -8,8 +8,13 @@ where
     S: Snapshot,
 {
     state.db.close();
-    let err_msg =
-        get_base_error(&state.delete(b"not important").expect_err("should error")).to_string();
+    let err_msg = get_base_error(
+        state
+            .delete(b"not important")
+            .expect_err("should error")
+            .as_ref(),
+    )
+    .to_string();
     assert!(err_msg.ends_with("db is closed") || err_msg.ends_with("Database closed"));
     state
 }

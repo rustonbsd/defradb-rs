@@ -1,7 +1,7 @@
 use crate::{State, tests};
 use corekv::{Db, Iter, IterOptions, Snapshot};
 
-fn test_end<D, S>(mut state: State<D, S>) -> State<D, S>
+fn test_reverse_start<D, S>(mut state: State<D, S>) -> State<D, S>
 where
     D: Db<Snapshot = S, Iter = S::Iter>,
     S: Snapshot,
@@ -16,14 +16,23 @@ where
         .expect("snapshot commit multiplier");
 
     let mut iter = state
-        .iter(IterOptions::builder().key_range_end(b"k3").build())
+        .iter(
+            IterOptions::builder()
+                .reverse(true)
+                .key_range_start(b"k2")
+                .build(),
+        )
         .expect("create iter");
 
-    iter.next().expect("yields next item");
-    assert_eq!(iter.key().expect("get key"), b"k1");
-    assert_eq!(iter.value().expect("get value"), b"v1");
+    assert!(iter.next().expect("yield next item"));
+    assert_eq!(iter.key().expect("get key"), b"k4");
+    assert_eq!(iter.value().expect("get value"), b"v4");
 
-    iter.next().expect("yield next item");
+    assert!(iter.next().expect("yield next item"));
+    assert_eq!(iter.key().expect("get key"), b"k3");
+    assert_eq!(iter.value().expect("get value"), b"");
+
+    assert!(iter.next().expect("yield next item"));
     assert_eq!(iter.key().expect("get key"), b"k2");
     assert_eq!(iter.value().expect("get value"), b"v2");
 
@@ -33,4 +42,4 @@ where
     state
 }
 
-tests!(test_end: db + snapshot);
+tests!(test_reverse_start: db + snapshot);
