@@ -1,0 +1,21 @@
+name: unit-tests
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Build once
+        run: cargo build --release
+
+      - name: Test corekv
+        run: cargo test -p corekv --tests --release
+
+      - name: Test keyring
+        run: cargo test -p keyring --tests --release
